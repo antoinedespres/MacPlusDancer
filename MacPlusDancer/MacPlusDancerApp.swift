@@ -66,12 +66,25 @@ struct MacPlusDancerApp: App {
             
             Section {
                 let isSeth = dancersModel.selectedDancer?.name == "Seth"
+                let followingClaude = dancersModel.claudeSyncEnabled
                 
-                Button(isSeth ? "Seth is not permitted to stop dancing" : dancersModel.toggleDancerButtonLabel) {
+                Button(dancerToggleLabel(isSeth: isSeth, followingClaude: followingClaude)) {
                     dancersModel.isDancing.toggle()
                 }
-                .disabled(isSeth)
-                .help(isSeth ? "If Seth stops dancing, he dies." : "")
+                .disabled(isSeth || followingClaude)
+                .help(isSeth && !followingClaude ? "If Seth stops dancing, he dies." : "")
+            }
+            
+            Section {
+                Toggle("Follow Claude Code", isOn: Binding(
+                    get: { dancersModel.claudeSyncEnabled },
+                    set: { dancersModel.setClaudeSyncEnabled($0) }
+                ))
+                .help("Dance while Claude Code is working, and stop when it finishes or needs you.")
+                
+                if dancersModel.claudeSyncEnabled {
+                    Text(dancersModel.claudeSyncStatus)
+                }
             }
             
             Section {
@@ -87,6 +100,12 @@ struct MacPlusDancerApp: App {
             Image(systemName: "figure.dance.circle")
                 .symbolVariant(dancersModel.isThereALittleDancerOnScreenAtThisVeryMoment ? .fill : .none)
         }
+    }
+    
+    private func dancerToggleLabel(isSeth: Bool, followingClaude: Bool) -> String {
+        if followingClaude { return "Claude Code is in charge of the dancing" }
+        if isSeth { return "Seth is not permitted to stop dancing" }
+        return dancersModel.toggleDancerButtonLabel
     }
     
     private func sortedGroupKeys() -> [String] {

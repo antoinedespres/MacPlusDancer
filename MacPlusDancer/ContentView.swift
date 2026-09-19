@@ -14,7 +14,7 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            if let selectedDancer = dancersModel.selectedDancer, dancersModel.isDancing {
+            if let selectedDancer = dancersModel.selectedDancer, dancersModel.shouldDance {
                 TransparentVideoPlayer(playerManager: playerManager)
                     .onChange(of: dancersModel.selectedDancer) { _, newDancer in
                         if let newDancer {
