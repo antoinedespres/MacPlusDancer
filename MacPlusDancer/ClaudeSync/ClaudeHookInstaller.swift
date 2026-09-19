@@ -47,8 +47,8 @@ enum ClaudeHookInstaller {
         Binding("PostToolUse", "working", "", "tool"),
         Binding("PostToolUseFailure", "working", "", "tool"),
         Binding("PostToolBatch", "working", "", "turn"),
-        Binding("PermissionRequest", "waiting", "permission", "turn"),
-        Binding("Notification", matcher: "permission_prompt", "waiting", "permission", "turn"),
+        Binding("PermissionRequest", "waiting", "permission", "tool"),
+        Binding("Notification", matcher: "permission_prompt", "waiting", "permission", "tool"),
         // A session parked at an empty prompt has stopped, it is not asking
         // anything: treating it as "needs you" would mute every other session.
         Binding("Notification", matcher: "idle_prompt", "idle"),

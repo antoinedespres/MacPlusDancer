@@ -103,17 +103,19 @@ final class ClaudeSessionMonitor {
     /// us was answered, and a turn nobody told us was interrupted.
     func effectiveState(of session: ClaudeSession, at now: Date = Date()) -> ClaudeSessionState {
         let age = now.timeIntervalSince(session.updatedAt)
-        switch session.state {
-        case .waiting:
-            guard session.reason == .permission else { return .waiting }
-            return age > Self.permissionGrace ? .working : .waiting
-        case .working:
-            if session.interrupted { return .idle }
-            let limit = session.phase == .tool ? toolTimeout : interruptTimeout
-            return age > limit ? .idle : .working
-        case .idle:
-            return .idle
+        if session.state == .idle { return .idle }
+
+        if session.state == .waiting {
+            // Only a permission prompt decays, and only into the rules below
+            // rather than straight to working: assuming it was approved means
+            // assuming a tool is running, which is a claim that can expire.
+            // Anything else the user has to answer stays put.
+            guard session.reason == .permission, age > Self.permissionGrace else { return .waiting }
         }
+
+        if session.interrupted { return .idle }
+        let limit = session.phase == .tool ? toolTimeout : interruptTimeout
+        return age > limit ? .idle : .working
     }
 
     var activity: Activity {

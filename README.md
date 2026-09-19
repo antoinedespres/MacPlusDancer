@@ -49,9 +49,10 @@ in the menu bar and the dancer will:
 Two of those have no event behind them, so they are read off a clock instead.
 
 Answering a permission prompt fires no hook, so the dancer stops for 20 seconds and
-then assumes you approved it and that the tool is now running. A question, a plan to
-approve or an MCP elicitation is bracketed by real events, so the dancer stops for
-exactly as long as it is on screen.
+then assumes you approved it and that the tool is now running. That assumption expires
+like any other running tool, so a prompt you walk away from does not dance forever. A
+question, a plan to approve or an MCP elicitation is bracketed by real events, so the
+dancer stops for exactly as long as it is on screen.
 
 Pressing Esc fires no hook either, not even the idle notification. It does leave a
 `[Request interrupted by user]` entry in the session transcript, though, and a
@@ -71,6 +72,9 @@ kept, and the original file is copied to `settings.json.macplusdancer-backup` th
 time the app writes to it. Each session reports its state to a file in
 `~/.claude/macplusdancer/sessions/`, which is all the app reads. A newer build of the
 app rewrites hooks left by an older one on launch.
+
+Every session counts, including ones running under an IDE extension rather than in a
+terminal, so the dancer keeps going while any window anywhere is busy.
 
 Turning the toggle off removes both the hook entries and the script. Sessions that were
 already running when you enabled it may need to be restarted before they start
