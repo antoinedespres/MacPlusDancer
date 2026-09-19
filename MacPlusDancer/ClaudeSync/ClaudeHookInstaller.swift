@@ -40,7 +40,7 @@ enum ClaudeHookInstaller {
         Binding("SessionStart", "idle"),
         Binding("UserPromptSubmit", "working", "", "turn"),
         // Pressing Esc fires nothing, so streaming has to prove it is alive.
-        Binding("MessageDisplay", "working", "", "turn"),
+        Binding("MessageDisplay", "working"),
         Binding("PreToolUse", matcher: "^(?!(\(blockingTools))$)", "working", "", "tool"),
         Binding("PreToolUse", matcher: blockingTools, "waiting", "question", "turn"),
         // Not "turn": sibling tools in the same batch may still be running.
@@ -213,10 +213,15 @@ enum ClaudeHookInstaller {
     phase="${3:-}"
     dir="$HOME/.claude/macplusdancer/sessions"
 
-    session=$(cat \
-      | grep -oE '"session_id"[[:space:]]*:[[:space:]]*"[^"]+"' \
-      | head -n 1 \
-      | sed -E 's/.*"([^"]+)"$/\1/')
+    payload=$(cat)
+    field() {
+      printf '%s' "$payload" \
+        | grep -oE "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]+\"" \
+        | head -n 1 \
+        | sed -E 's/.*"([^"]+)"$/\1/'
+    }
+    session=$(field session_id)
+    transcript=$(field transcript_path)
 
     [ -n "$session" ] || exit 0
 
@@ -232,12 +237,21 @@ enum ClaudeHookInstaller {
 
     mkdir -p "$dir" || exit 0
 
+    # Carry over anything this event did not report. MessageDisplay in
+    # particular can land after the PreToolUse of the call it precedes, and
+    # must not downgrade a running tool back to a plain turn.
+    file="$dir/$session.json"
+    if [ -f "$file" ]; then
+      [ -n "$phase" ] || phase=$(sed -n 's|.*"phase":"\([^"]*\)".*|\1|p' "$file")
+      [ -n "$transcript" ] || transcript=$(sed -n 's|.*"transcript":"\([^"]*\)".*|\1|p' "$file")
+    fi
+
     # $PPID is the claude process itself: hooks are run in exec form, so no
     # shell sits in between. The app uses it to drop files left by a session
     # that was killed before SessionEnd could fire.
     tmp="$dir/.$session.$$"
-    printf '{"session_id":"%s","state":"%s","reason":"%s","phase":"%s","pid":%s,"updated_at":%s}\n' \
-      "$session" "$state" "$reason" "$phase" "$PPID" "$(date +%s)" > "$tmp" || exit 0
+    printf '{"session_id":"%s","state":"%s","reason":"%s","phase":"%s","transcript":"%s","pid":%s,"updated_at":%s}\n' \
+      "$session" "$state" "$reason" "$phase" "$transcript" "$PPID" "$(date +%s)" > "$tmp" || exit 0
 
     # Rename so the app sees one atomic write to the directory.
     mv -f "$tmp" "$dir/$session.json"

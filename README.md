@@ -53,11 +53,17 @@ then assumes you approved it and that the tool is now running. A question, a pla
 approve or an MCP elicitation is bracketed by real events, so the dancer stops for
 exactly as long as it is on screen.
 
-Pressing Esc fires no hook either, not even the idle notification. While Claude is
-thinking or streaming it emits `MessageDisplay` about once a second, so 15 seconds of
-silence is taken to mean the turn was interrupted. A tool in flight emits nothing at
-all, so silence during one is only suspicious after 10 minutes. Both numbers are
-constants at the top of `ClaudeSessionMonitor`.
+Pressing Esc fires no hook either, not even the idle notification. It does leave a
+`[Request interrupted by user]` entry in the session transcript, though, and a
+transcript is otherwise untouched for as long as a tool runs. So a transcript that has
+grown since the last hook means the turn ended without anyone saying so, which catches
+an Esc during a long tool on the next poll.
+
+Interrupts too close to the last hook to tell apart from a tool finishing normally fall
+back to a timeout. While Claude is thinking or streaming it emits `MessageDisplay`
+about once a second, so 15 seconds of silence is taken to mean the turn is over. A tool
+in flight emits nothing at all, so silence during one is only suspicious after 10
+minutes. All three numbers are constants at the top of `ClaudeSessionMonitor`.
 
 Enabling the toggle installs a small hook script at `~/.claude/macplusdancer/hook.sh`
 and registers it in `~/.claude/settings.json`. Your existing settings and hooks are

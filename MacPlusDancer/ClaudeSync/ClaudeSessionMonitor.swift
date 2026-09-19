@@ -42,6 +42,9 @@ struct ClaudeSession: Identifiable, Hashable {
     let phase: ClaudeSessionPhase
     let pid: pid_t
     let updatedAt: Date
+    /// Set when the transcript grew after the last hook fired, which only
+    /// happens when something went unreported: the turn was interrupted.
+    let interrupted: Bool
 }
 
 /// Watches the state files written by the hook script that
@@ -89,6 +92,9 @@ final class ClaudeSessionMonitor {
     /// A tool in flight emits nothing at all and a build may legitimately run
     /// for minutes, so silence is only suspicious after much longer.
     private let toolTimeout: TimeInterval = 10 * 60
+    /// A normally finishing tool writes its result to the transcript a moment
+    /// before `PostToolUse` fires, so ignore that much overlap.
+    private static let transcriptGrace: TimeInterval = 3
     /// Backstop for deleting the file of a session that is genuinely gone.
     private let absoluteTimeout: TimeInterval = 24 * 60 * 60
 
@@ -102,6 +108,7 @@ final class ClaudeSessionMonitor {
             guard session.reason == .permission else { return .waiting }
             return age > Self.permissionGrace ? .working : .waiting
         case .working:
+            if session.interrupted { return .idle }
             let limit = session.phase == .tool ? toolTimeout : interruptTimeout
             return age > limit ? .idle : .working
         case .idle:
@@ -234,14 +241,27 @@ final class ClaudeSessionMonitor {
         else { return nil }
 
         let pid = (object["pid"] as? Int).map { pid_t($0) } ?? 0
+        let updated = Date(timeIntervalSince1970: updatedAt)
         return ClaudeSession(
             id: id,
             state: state,
             reason: (object["reason"] as? String).flatMap(ClaudeWaitReason.init(rawValue:)),
             phase: (object["phase"] as? String).flatMap(ClaudeSessionPhase.init(rawValue:)) ?? .turn,
             pid: pid,
-            updatedAt: Date(timeIntervalSince1970: updatedAt)
+            updatedAt: updated,
+            interrupted: wasInterrupted(transcript: object["transcript"] as? String, since: updated)
         )
+    }
+
+    /// Claude Code writes an interrupt into the transcript but fires no hook
+    /// for it, and leaves the transcript untouched for as long as a tool runs.
+    /// So a transcript newer than the last hook means the turn ended unseen.
+    private static func wasInterrupted(transcript: String?, since: Date) -> Bool {
+        guard let transcript, !transcript.isEmpty,
+              let attributes = try? FileManager.default.attributesOfItem(atPath: transcript),
+              let modified = attributes[.modificationDate] as? Date
+        else { return false }
+        return modified.timeIntervalSince(since) > transcriptGrace
     }
 
     /// `ESRCH` is the only answer that proves the process is gone; `EPERM`
